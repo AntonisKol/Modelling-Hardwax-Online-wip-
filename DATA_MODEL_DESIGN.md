@@ -1,4 +1,3 @@
-# Hardwax Online Data Engineering Assessment
 
 ## 1: Data Model Design
 
