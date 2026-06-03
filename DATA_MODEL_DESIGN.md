@@ -1,34 +1,41 @@
-# Database schema
+# Hardwax Online Data Engineering Assessment
 
-## ARTISTS
+## 1: Data Model Design
 
-- `artist_id` (PK)
-- `artist_name`
+Design the relational database that can be used to populate the Hardwax releases module on the homepage.
 
-## RELEASES
+### Database Schema
 
-- `release_id` (PK)
-- `artist_id` (FK)
-- `title`
-- `description`
-- `catalog_number`
-- `price`
-- `image_url`
-- `label_id` (FK)
-- `format_id` (FK)
+#### ARTISTS
+- `artist_id` (PK, AUTOINCREMENT)
+- `artist_name` (TEXT, UNIQUE, NOT NULL)
 
-## LABELS
+#### LABELS
+- `label_id` (PK, AUTOINCREMENT)
+- `label_name` (TEXT, UNIQUE, NOT NULL)
 
-- `label_id` (PK)
-- `label_name`
+#### FORMATS
+- `format_id` (PK, AUTOINCREMENT)
+- `format_name` (TEXT, UNIQUE, NOT NULL)
 
-## FORMATS
+#### RELEASES
+- `release_id` (PK, AUTOINCREMENT)
+- `artist_id` (FK → ARTISTS.artist_id)
+- `title` (TEXT, NOT NULL)
+- `description` (TEXT)
+- `catalog_number` (TEXT)
+- `price` (TEXT)
+- `image_url` (TEXT)
+- `label_id` (FK → LABELS.label_id)
 
-- `format_id` (PK)
-- `format_name`
+#### RELEASE_FORMATS (Junction Table)
+- `release_id` (FK → RELEASES.release_id, PK)
+- `format_id` (FK → FORMATS.format_id, PK)
+- **Purpose:** Links releases to multiple formats (e.g., vinyl + digital)
 
-## TRACKS
+#### TRACKS
+- `track_id` (PK, AUTOINCREMENT)
+- `release_id` (FK → RELEASES.release_id)
+- `track_name` (TEXT, NOT NULL)
 
-- `track_id` (PK)
-- `release_id` (FK)
-- `track_name`
+### Relationships
