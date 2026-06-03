@@ -1,5 +1,5 @@
 
-## 1: Data Model Design
+## Data Model Design
 
 Design the relational database that can be used to populate the Hardwax releases module on the homepage.
 
