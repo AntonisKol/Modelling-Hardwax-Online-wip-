@@ -1,6 +1,6 @@
-import sqlite3
+from db import get_connection, close_connection
 
-conn = sqlite3.connect('hardwax.db')
+conn = get_connection()
 cursor = conn.cursor()
 
 print("=" * 80)
@@ -17,7 +17,8 @@ query1 = '''
         r.catalog_number,
         r.price
     FROM RELEASES r
-    JOIN ARTISTS a ON r.artist_id = a.artist_id
+    JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+    JOIN ARTISTS a ON ra.artist_id = a.artist_id
     JOIN LABELS l ON r.label_id = l.label_id
     ORDER BY r.release_id DESC
 '''
@@ -46,7 +47,8 @@ if label_sample:
             r.price,
             GROUP_CONCAT(f.format_name, ', ') as formats
         FROM RELEASES r
-        JOIN ARTISTS a ON r.artist_id = a.artist_id
+        JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+        JOIN ARTISTS a ON ra.artist_id = a.artist_id
         JOIN LABELS l ON r.label_id = l.label_id
         LEFT JOIN RELEASE_FORMATS rf ON r.release_id = rf.release_id
         LEFT JOIN FORMATS f ON rf.format_id = f.format_id
@@ -59,7 +61,7 @@ if label_sample:
     results = cursor.fetchall()
     print(f"\nReleases from label '{label_name}':\n")
     for row in results:
-        print(f"{row[0]} - {row[1]} | {row[2]} | Formats: {row[3]}")
+        print(f"{row[0]} - {row[1]} ({row[3]}) | {row[2]}")
 
 print("\n" + "=" * 80)
 print("QUERY 3: RELEASES BY FORMAT")
@@ -89,7 +91,8 @@ query3b = '''
         r.title,
         r.price
     FROM RELEASES r
-    JOIN ARTISTS a ON r.artist_id = a.artist_id
+    JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+    JOIN ARTISTS a ON ra.artist_id = a.artist_id
     JOIN RELEASE_FORMATS rf ON r.release_id = rf.release_id
     JOIN FORMATS f ON rf.format_id = f.format_id
     WHERE f.format_name = ?
@@ -117,7 +120,8 @@ query4_release = '''
         r.price,
         GROUP_CONCAT(f.format_name, ', ') as formats
     FROM RELEASES r
-    JOIN ARTISTS a ON r.artist_id = a.artist_id
+    JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+    JOIN ARTISTS a ON ra.artist_id = a.artist_id
     JOIN LABELS l ON r.label_id = l.label_id
     LEFT JOIN RELEASE_FORMATS rf ON r.release_id = rf.release_id
     LEFT JOIN FORMATS f ON rf.format_id = f.format_id
@@ -163,10 +167,11 @@ query5 = '''
         GROUP_CONCAT(f.format_name, ', ') as formats,
         r.price
     FROM RELEASES r
+    JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
     JOIN LABELS l ON r.label_id = l.label_id
     LEFT JOIN RELEASE_FORMATS rf ON r.release_id = rf.release_id
     LEFT JOIN FORMATS f ON rf.format_id = f.format_id
-    WHERE r.artist_id = ?
+    WHERE ra.artist_id = ?
     GROUP BY r.release_id
     ORDER BY r.release_id DESC
 '''
@@ -193,7 +198,8 @@ query6 = '''
         GROUP_CONCAT(f.format_name, ', ') as formats,
         r.price
     FROM RELEASES r
-    JOIN ARTISTS a ON r.artist_id = a.artist_id
+    JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+    JOIN ARTISTS a ON ra.artist_id = a.artist_id
     JOIN LABELS l ON r.label_id = l.label_id
     LEFT JOIN RELEASE_FORMATS rf ON r.release_id = rf.release_id
     LEFT JOIN FORMATS f ON rf.format_id = f.format_id
@@ -210,7 +216,7 @@ print(f"Found {len(results)} releases\n")
 for row in results[:5]:
     print(f"{row[0]} - {row[1]} | {row[2]} | Formats: {row[3]}")
 
-conn.close()
+close_connection(conn)
 
 print("\n" + "=" * 80)
 print("All queries executed successfully!")

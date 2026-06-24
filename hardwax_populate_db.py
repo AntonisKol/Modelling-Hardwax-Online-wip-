@@ -136,7 +136,7 @@ for link in release_links:
             artist_id = artist[0]
         else:
             cursor.execute('INSERT INTO ARTISTS (artist_name) VALUES (?)', (artist_name,))
-            artist_id = cursor.lastrowid
+            artist_id = cursor.lastrowid # <- Get the ID of the newly inserted artist
         
         if label_name:
             cursor.execute('SELECT label_id FROM LABELS WHERE label_name = ?', (label_name,))

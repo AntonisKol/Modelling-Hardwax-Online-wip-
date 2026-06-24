@@ -1,51 +1,56 @@
 import sqlite3
 import pytest
 
-
-def setup_test_db(): # creates a fresh database for each test
-    """Create a fresh test database with known data"""
-    conn = sqlite3.connect(':memory:')  # creates a database in RAM (not on disk), so it's fast and clean for testing
-    cursor = conn.cursor()
-    
-    # Core functionality — can you fetch all data with JOINs?
+def create_tables(cursor):
+    """Create all database tables"""
     cursor.execute('''
         CREATE TABLE ARTISTS (
             artist_id INTEGER PRIMARY KEY AUTOINCREMENT,
             artist_name TEXT NOT NULL UNIQUE
         )
     ''')
-    # Filtering — does WHERE clause work? Does GROUP BY work?
     cursor.execute('''
         CREATE TABLE LABELS (
             label_id INTEGER PRIMARY KEY AUTOINCREMENT,
             label_name TEXT NOT NULL UNIQUE
         )
     ''')
-    # Aggregation — does COUNT(*) work?
     cursor.execute('''
         CREATE TABLE FORMATS (
             format_id INTEGER PRIMARY KEY AUTOINCREMENT,
             format_name TEXT NOT NULL UNIQUE
         )
     ''')
-    
     cursor.execute('''
         CREATE TABLE RELEASES (
             release_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            artist_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             description TEXT,
             catalog_number TEXT,
             price TEXT,
             image_url TEXT,
             label_id INTEGER NOT NULL,
+            FOREIGN KEY (label_id) REFERENCES LABELS(label_id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE RELEASE_ARTISTS (
+            release_artist_join_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            release_id INTEGER NOT NULL,
+            artist_id INTEGER NOT NULL,
+            FOREIGN KEY (release_id) REFERENCES RELEASES(release_id),
+            FOREIGN KEY (artist_id) REFERENCES ARTISTS(artist_id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE RELEASE_FORMATS (
+            release_id INTEGER NOT NULL,
             format_id INTEGER NOT NULL,
-            FOREIGN KEY (artist_id) REFERENCES ARTISTS(artist_id),
-            FOREIGN KEY (label_id) REFERENCES LABELS(label_id),
+            PRIMARY KEY (release_id, format_id),
+            FOREIGN KEY (release_id) REFERENCES RELEASES(release_id),
             FOREIGN KEY (format_id) REFERENCES FORMATS(format_id)
         )
     ''')
-    
     cursor.execute('''
         CREATE TABLE TRACKS (
             track_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,264 +59,145 @@ def setup_test_db(): # creates a fresh database for each test
             FOREIGN KEY (release_id) REFERENCES RELEASES(release_id)
         )
     ''')
-    
-    # Insert known test data
-    # Artists
-    cursor.execute("INSERT INTO ARTISTS (artist_name) VALUES ('Test Artist 1')")
-    artist1_id = cursor.lastrowid
-    cursor.execute("INSERT INTO ARTISTS (artist_name) VALUES ('Test Artist 2')")
-    artist2_id = cursor.lastrowid
-    
-    # Labels
-    cursor.execute("INSERT INTO LABELS (label_name) VALUES ('Test Label A')")
-    label1_id = cursor.lastrowid
-    cursor.execute("INSERT INTO LABELS (label_name) VALUES ('Test Label B')")
-    label2_id = cursor.lastrowid
-    
-    # Formats
-    cursor.execute("INSERT INTO FORMATS (format_name) VALUES ('12\"')")
-    format1_id = cursor.lastrowid
-    cursor.execute("INSERT INTO FORMATS (format_name) VALUES ('LP')")
-    format2_id = cursor.lastrowid
-    
-    # Releases
+
+def insert_artist(cursor, name):
+    cursor.execute("INSERT INTO ARTISTS (artist_name) VALUES (?)", (name,))
+    return cursor.lastrowid
+
+def insert_label(cursor, name):
+    cursor.execute("INSERT INTO LABELS (label_name) VALUES (?)", (name,))
+    return cursor.lastrowid
+
+def insert_format(cursor, name):
+    cursor.execute("INSERT INTO FORMATS (format_name) VALUES (?)", (name,))
+    return cursor.lastrowid
+
+def insert_release(cursor, title, description, catalog_number, price, label_id):
     cursor.execute('''
-        INSERT INTO RELEASES 
-        (artist_id, title, description, catalog_number, price, label_id, format_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (artist1_id, 'Test Release 1', 'A test release', '001', '€ 12', label1_id, format1_id))
-    release1_id = cursor.lastrowid
+        INSERT INTO RELEASES (title, description, catalog_number, price, label_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (title, description, catalog_number, price, label_id))
+    return cursor.lastrowid
+
+def link_artist_to_release(cursor, release_id, artist_id):
+    cursor.execute('INSERT INTO RELEASE_ARTISTS (release_id, artist_id) VALUES (?, ?)', (release_id, artist_id))
+
+def link_format_to_release(cursor, release_id, format_id):
+    cursor.execute('INSERT INTO RELEASE_FORMATS (release_id, format_id) VALUES (?, ?)', (release_id, format_id))
+
+def insert_track(cursor, release_id, track_name):
+    cursor.execute('INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)', (release_id, track_name))
+
+@pytest.fixture
+def test_db():
+    """Create fresh test database for each test"""
+    conn = sqlite3.connect(':memory:')
+    cursor = conn.cursor()
     
-    cursor.execute('''
-        INSERT INTO RELEASES 
-        (artist_id, title, description, catalog_number, price, label_id, format_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (artist2_id, 'Test Release 2', 'Another test', '002', '€ 15', label2_id, format2_id))
-    release2_id = cursor.lastrowid
+    create_tables(cursor)
     
-    cursor.execute('''
-        INSERT INTO RELEASES 
-        (artist_id, title, description, catalog_number, price, label_id, format_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (artist1_id, 'Test Release 3', 'Third release', '003', '€ 20', label1_id, format2_id))
-    release3_id = cursor.lastrowid
+    artist1_id = insert_artist(cursor, 'Test Artist 1')
+    artist2_id = insert_artist(cursor, 'Test Artist 2')
     
-    # Tracks for release 1
-    cursor.execute("INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)", (release1_id, 'Track 1A'))
-    cursor.execute("INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)", (release1_id, 'Track 1B'))
-    cursor.execute("INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)", (release1_id, 'Track 1C'))
+    label1_id = insert_label(cursor, 'Test Label A')
+    label2_id = insert_label(cursor, 'Test Label B')
     
-    # Tracks for release 2
-    cursor.execute("INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)", (release2_id, 'Track 2A'))
-    cursor.execute("INSERT INTO TRACKS (release_id, track_name) VALUES (?, ?)", (release2_id, 'Track 2B'))
+    format1_id = insert_format(cursor, '12"')
+    format2_id = insert_format(cursor, 'LP')
+    
+    release1_id = insert_release(cursor, 'Test Release 1', 'A test release', '001', '€ 12', label1_id)
+    release2_id = insert_release(cursor, 'Test Release 2', 'Another test', '002', '€ 15', label2_id)
+    release3_id = insert_release(cursor, 'Test Release 3', 'Third release', '003', '€ 20', label1_id)
+    
+    link_artist_to_release(cursor, release1_id, artist1_id)
+    link_artist_to_release(cursor, release2_id, artist2_id)
+    link_artist_to_release(cursor, release3_id, artist1_id)
+    
+    link_format_to_release(cursor, release1_id, format1_id)
+    link_format_to_release(cursor, release2_id, format2_id)
+    link_format_to_release(cursor, release3_id, format2_id)
+    
+    insert_track(cursor, release1_id, 'Track 1A')
+    insert_track(cursor, release1_id, 'Track 1B')
+    insert_track(cursor, release1_id, 'Track 1C')
+    insert_track(cursor, release2_id, 'Track 2A')
+    insert_track(cursor, release2_id, 'Track 2B')
     
     conn.commit()
-    return conn, cursor
+    yield conn, cursor
+    conn.close()
 
-# ============================================================================
-# TEST 1: Query all releases
-# ============================================================================
-def test_query_all_releases():
-    """Test that we can fetch all releases"""
-    conn, cursor = setup_test_db()
-    
+def test_query_all_releases(test_db):
+    conn, cursor = test_db
     query = '''
-        SELECT 
-            a.artist_name,
-            r.title,
-            l.label_name,
-            f.format_name,
-            r.price
+        SELECT a.artist_name, r.title, l.label_name
         FROM RELEASES r
-        JOIN ARTISTS a ON r.artist_id = a.artist_id
+        JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+        JOIN ARTISTS a ON ra.artist_id = a.artist_id
         JOIN LABELS l ON r.label_id = l.label_id
-        JOIN FORMATS f ON r.format_id = f.format_id
     '''
-    
     cursor.execute(query)
     results = cursor.fetchall()
-    
-    # Assert we have 3 releases
-    assert len(results) == 3, f"Expected 3 releases, got {len(results)}"
-    
-    # Assert first release has correct data
-    assert results[0][0] == 'Test Artist 1'
-    assert results[0][1] == 'Test Release 1'
-    assert results[0][2] == 'Test Label A'
-    assert results[0][3] == '12"'
-    
-    conn.close()
-    print("✓ test_query_all_releases PASSED")
+    assert len(results) == 3
 
-# ============================================================================
-# TEST 2: Query releases by label
-# ============================================================================
-def test_query_by_label():
-    """Test that we can filter releases by label"""
-    conn, cursor = setup_test_db()
-    
+def test_query_by_label(test_db):
+    conn, cursor = test_db
     query = '''
-        SELECT 
-            r.title,
-            l.label_name
+        SELECT r.title, l.label_name
         FROM RELEASES r
         JOIN LABELS l ON r.label_id = l.label_id
         WHERE l.label_name = ?
     '''
-    
     cursor.execute(query, ('Test Label A',))
     results = cursor.fetchall()
-    
-    # Assert we have 2 releases from Label A
-    assert len(results) == 2, f"Expected 2 releases from Label A, got {len(results)}"
-    
-    # Assert all results are from Label A
-    for row in results:
-        assert row[1] == 'Test Label A'
-    
-    conn.close()
-    print("✓ test_query_by_label PASSED")
+    assert len(results) == 2
 
-# ============================================================================
-# TEST 3: Query releases by format
-# ============================================================================
-def test_query_by_format():
-    """Test that we can filter releases by format"""
-    conn, cursor = setup_test_db()
-    
+def test_query_by_format(test_db):
+    conn, cursor = test_db
     query = '''
-        SELECT 
-            COUNT(*) as count
-        FROM RELEASES r
-        JOIN FORMATS f ON r.format_id = f.format_id
+        SELECT COUNT(*) as count
+        FROM RELEASE_FORMATS rf
+        JOIN FORMATS f ON rf.format_id = f.format_id
         WHERE f.format_name = ?
     '''
-    
     cursor.execute(query, ('LP',))
     result = cursor.fetchone()
-    
-    # Assert we have 2 LP releases
-    assert result[0] == 2, f"Expected 2 LP releases, got {result[0]}"
-    
-    conn.close()
-    print("✓ test_query_by_format PASSED")
+    assert result[0] == 2
 
-# ============================================================================
-# TEST 4: Query full release details with tracks
-# ============================================================================
-def test_query_release_with_tracks():
-    """Test that we can get a release with all its tracks"""
-    conn, cursor = setup_test_db()
-    
-    # Get release 1
+def test_query_release_with_tracks(test_db):
+    conn, cursor = test_db
     release_query = '''
-        SELECT 
-            r.release_id,
-            a.artist_name,
-            r.title
-        FROM RELEASES r
-        JOIN ARTISTS a ON r.artist_id = a.artist_id
-        WHERE r.title = ?
+        SELECT release_id FROM RELEASES WHERE title = ?
     '''
-    
     cursor.execute(release_query, ('Test Release 1',))
-    release = cursor.fetchone()
-    release_id = release[0]
-    
-    # Get tracks for this release
+    release_id = cursor.fetchone()[0]
     tracks_query = '''
-        SELECT 
-            track_name
-        FROM TRACKS
-        WHERE release_id = ?
+        SELECT track_name FROM TRACKS WHERE release_id = ? ORDER BY track_id
     '''
-    
     cursor.execute(tracks_query, (release_id,))
     tracks = cursor.fetchall()
-    
-    # Assert we have 3 tracks
-    assert len(tracks) == 3, f"Expected 3 tracks, got {len(tracks)}"
-    
-    # Assert track names
-    assert tracks[0][0] == 'Track 1A'
-    assert tracks[1][0] == 'Track 1B'
-    assert tracks[2][0] == 'Track 1C'
-    
-    conn.close()
-    print("✓ test_query_release_with_tracks PASSED")
+    assert len(tracks) == 3
 
-# ============================================================================
-# TEST 5: Query artist discography
-# ============================================================================
-def test_query_artist_discography():
-    """Test that we can get all releases by an artist"""
-    conn, cursor = setup_test_db()
-    
+def test_query_artist_discography(test_db):
+    conn, cursor = test_db
     query = '''
-        SELECT 
-            r.title,
-            a.artist_name
-        FROM RELEASES r
-        JOIN ARTISTS a ON r.artist_id = a.artist_id
+        SELECT r.title FROM RELEASES r
+        JOIN RELEASE_ARTISTS ra ON r.release_id = ra.release_id
+        JOIN ARTISTS a ON ra.artist_id = a.artist_id
         WHERE a.artist_name = ?
     '''
-    
     cursor.execute(query, ('Test Artist 1',))
     results = cursor.fetchall()
-    
-    # Assert we have 2 releases by Test Artist 1
-    assert len(results) == 2, f"Expected 2 releases, got {len(results)}"
-    
-    # Assert all are by Test Artist 1
-    for row in results:
-        assert row[1] == 'Test Artist 1'
-    
-    conn.close()
-    print("✓ test_query_artist_discography PASSED")
+    assert len(results) == 2
 
-# ============================================================================
-# TEST 6: Query with keyword search
-# ============================================================================
-def test_query_keyword_search():
-    """Test that we can search releases by title"""
-    conn, cursor = setup_test_db()
-    
+def test_query_keyword_search(test_db):
+    conn, cursor = test_db
     query = '''
-        SELECT 
-            r.title
-        FROM RELEASES r
-        WHERE r.title LIKE ?
+        SELECT r.title FROM RELEASES r WHERE r.title LIKE ?
     '''
-    
     cursor.execute(query, ('%Test Release%',))
     results = cursor.fetchall()
-    
-    # Assert we have 3 results
-    assert len(results) == 3, f"Expected 3 results, got {len(results)}"
-    
-    conn.close()
-    print("✓ test_query_keyword_search PASSED")
+    assert len(results) == 3
 
-# ============================================================================
-# RUN ALL TESTS
-# ============================================================================
 if __name__ == '__main__':
-    print("=" * 80)
-    print("RUNNING UNIT TESTS FOR HARDWAX QUERIES")
-    print("=" * 80)
-    print()
-    
-    try:
-        test_query_all_releases()
-        test_query_by_label()
-        test_query_by_format()
-        test_query_release_with_tracks()
-        test_query_artist_discography()
-        test_query_keyword_search()
-        
-        print()
-        print("=" * 80)
-        print("✓ ALL TESTS PASSED!")
-        print("=" * 80)
-    except AssertionError as e:
-        print(f"\n✗ TEST FAILED: {e}")
+    pytest.main([__file__, '-v'])

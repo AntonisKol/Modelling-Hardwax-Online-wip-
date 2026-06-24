@@ -37,4 +37,3 @@ Design the relational database that can be used to populate the Hardwax releases
 - `release_id` (FK → RELEASES.release_id)
 - `track_name` (TEXT, NOT NULL)
 
-### Relationships
